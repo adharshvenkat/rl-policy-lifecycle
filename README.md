@@ -51,7 +51,9 @@ translate, Q/E turn, space to zero) in place of a physical gamepad.
 uv run python scripts/deploy_go1_keyboard.py --terrain rough
 ```
 
-![Go1 rough-terrain rollout](assets/go1_rollout.gif)
+<p align="center">
+  <img src="assets/go1_rollout.gif" alt="Go1 rough-terrain rollout" width="420">
+</p>
 
 **`h1_fall_diagnostic.py`** - restores a checkpoint, rolls out N episodes in
 parallel with independently sampled commands, and reports per-episode survival
