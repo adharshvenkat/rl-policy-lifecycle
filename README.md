@@ -18,15 +18,27 @@ locomotion run illustrate the gap:
 
 | checkpoint | eval reward | fall rate | avg survival |
 |---|---|---|---|
-| 103M steps | 74.4 | 87.5% | 37.8% |
-| 300M steps | 68.2 (peaked 77.8 @ 68.8M, declined after) | 68.8% | 73.8% |
+| H1 humanoid, 103M steps | 74.4 | 87.5% | 37.8% |
+| H1 humanoid, 300M steps | 68.2 (peaked 77.8 @ 68.8M, declined after) | 68.8% | 73.8% |
 
-By reward alone the 103M checkpoint looks equal or better. `h1_fall_diagnostic.py`
+By reward alone the 103M checkpoint looks equal or better. `fall_diagnostic.py`
 rolls out N episodes with independently sampled commands and tracks per-episode
 survival against the env's own fall/termination condition, decoupled from the
 reward signal entirely. Under that measure the 300M checkpoint is roughly twice
 as robust. The reward curve was not wrong, it just wasn't answering the
 question that mattered for picking a checkpoint to deploy.
+
+The same script, unmodified, also measures a completely different morphology:
+
+| checkpoint | fall rate | avg survival |
+|---|---|---|
+| Go1 quadruped, rough terrain | 18.8% | 94.2% |
+
+Go1 is far more robust than either H1 checkpoint on the same command range.
+That tracks with the underlying physics (a 4-point stance with a lower center
+of mass is structurally easier to balance than a biped), but the point is this
+is a measured number, not an assumption from watching a rollout video look
+smooth for a few seconds.
 
 ## Scripts
 
@@ -55,13 +67,15 @@ uv run python scripts/deploy_go1_keyboard.py --terrain rough
   <img src="assets/go1_rollout.gif" alt="Go1 rough-terrain rollout" width="420">
 </p>
 
-**`h1_fall_diagnostic.py`** - restores a checkpoint, rolls out N episodes in
+**`fall_diagnostic.py`** - restores a checkpoint, rolls out N episodes in
 parallel with independently sampled commands, and reports per-episode survival
 length against the env's fall/termination condition, plus aggregate fall rate.
+Env-agnostic; verified against both H1JoystickGaitTracking (humanoid) and
+Go1JoystickRoughTerrain (quadruped).
 
 ```
-uv run python scripts/h1_fall_diagnostic.py \
-    --env_name H1JoystickGaitTracking \
+uv run python scripts/fall_diagnostic.py \
+    --env_name Go1JoystickRoughTerrain \
     --checkpoint_path <path-to-checkpoint> \
     --num_episodes 32
 ```

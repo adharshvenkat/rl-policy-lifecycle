@@ -6,10 +6,14 @@ overall fall rate. Useful for judging policy robustness beyond the scalar
 eval/episode_reward curve, which can look fine even when a policy has failed
 to generalize across the command space (e.g. forward-only competence).
 
+Works against any registered locomotion env exposing the standard
+info["command"] / done interface (verified against both H1JoystickGaitTracking
+and Go1JoystickRoughTerrain).
+
 Usage:
-  uv run python scripts/h1_fall_diagnostic.py \
-      --env_name H1JoystickGaitTracking \
-      --checkpoint_path logs/H1JoystickGaitTracking-20260801-180820/checkpoints/000309657600
+  uv run python scripts/fall_diagnostic.py \
+      --env_name Go1JoystickRoughTerrain \
+      --checkpoint_path logs/Go1JoystickRoughTerrain-20260801-112323/checkpoints/000206438400
 """
 import argparse
 import functools
