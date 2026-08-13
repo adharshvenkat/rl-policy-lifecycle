@@ -1,7 +1,6 @@
 import time
 
 import mujoco
-import mujoco.viewer as viewer
 import numpy as np
 import onnxruntime as rt
 import rclpy
@@ -140,19 +139,16 @@ class PolicyBridgeNode(Node):
     self._tf_broadcaster.sendTransform(tf)
 
   def run(self):
-    with viewer.launch_passive(self._model, self._data) as v:
-      v.cam.trackbodyid = self._model.body("trunk").id
-      while v.is_running() and rclpy.ok():
-        step_start = time.time()
-        mujoco.mj_step(self._model, self._data)
-        self._step_count += 1
-        if self._step_count % self._n_substeps == 0:
-          self._publish_odom()
-        v.sync()
-        rclpy.spin_once(self, timeout_sec=0)
-        dt_left = self._sim_dt - (time.time() - step_start)
-        if dt_left > 0:
-          time.sleep(dt_left)
+    while rclpy.ok():
+      step_start = time.time()
+      mujoco.mj_step(self._model, self._data)
+      self._step_count += 1
+      if self._step_count % self._n_substeps == 0:
+        self._publish_odom()
+      rclpy.spin_once(self, timeout_sec=0)
+      dt_left = self._sim_dt - (time.time() - step_start)
+      if dt_left > 0:
+        time.sleep(dt_left)
 
 
 def main():
