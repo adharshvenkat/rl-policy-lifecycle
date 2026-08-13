@@ -80,6 +80,59 @@ uv run python scripts/fall_diagnostic.py \
     --num_episodes 32
 ```
 
+## ROS2 integration (Nav2)
+
+`ros2/go1_policy_bridge` wraps the exported Go1 policy as a ROS2 node that
+looks like a normal robot driver to the rest of a Nav2 stack: subscribes
+`/cmd_vel`, runs the policy against a headless MuJoCo sim at 50Hz, and
+publishes `/odom` plus the `odom -> trunk` TF from sim ground-truth sensors
+(`position`/`orientation`/`local_linvel`/`gyro` on the Go1 model's IMU site).
+
+The RL inference loop intentionally does not go through `ros2_control`. That
+abstraction is built around classical position/velocity/effort controllers
+with real-time and fixed-update-rate assumptions that don't map cleanly onto
+"run a neural net and push joint targets as fast as possible" - the pattern
+used across most learned-locomotion legged/humanoid platforms is a dedicated
+inference loop with ROS2 sitting above it as the task/navigation layer, which
+is what this node does. `ros2_control` is still the right tool for an
+arm/manipulation stack sitting on top of this (e.g. via MoveIt2) - matching
+the abstraction to the actual control pattern, not avoiding `ros2_control`
+categorically.
+
+Build and run inside a colcon workspace:
+
+```
+cd <your_ros2_ws>/src
+cp -r <this_repo>/ros2/go1_policy_bridge .
+cd <your_ros2_ws>
+source /opt/ros/jazzy/setup.bash
+colcon build --packages-select go1_policy_bridge
+source install/setup.bash
+```
+
+The package imports `mujoco`/`onnxruntime`/`mujoco_playground` from the
+`mujoco_playground` `uv` venv, but `colcon`/`ros2 run` execute under system
+Python - these are two separate interpreters that don't share packages by
+default. Point system Python at the venv's packages (and, if
+`mujoco_playground` is an editable install, at its repo root, since editable
+installs use a `.pth` file that only gets processed by a venv's own site-init,
+not by a bare `PYTHONPATH` entry) before running:
+
+```
+export PYTHONPATH="<mujoco_playground_repo>:<mujoco_playground_repo>/.venv/lib/python3.12/site-packages:$PYTHONPATH"
+ros2 run go1_policy_bridge policy_bridge_node --ros-args \
+    -p policy_path:=<path-to-go1_rough_policy.onnx> \
+    -p terrain:=rough
+```
+
+Then drive it like any other `/cmd_vel`-consuming robot (manual test, a
+teleop node, or eventually Nav2 itself):
+
+```
+ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.5}, angular: {z: 0.3}}" --once
+ros2 topic echo /odom
+```
+
 ## Setup
 
 Requires a working mujoco_playground install (JAX/MJX, Brax, mujoco_menagerie

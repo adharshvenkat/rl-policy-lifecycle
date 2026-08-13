@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>go1_policy_bridge</name>
+  <version>0.0.0</version>
+  <description>ROS2 bridge exposing a trained Go1 RL locomotion policy as a Nav2-compatible robot driver: subscribes /cmd_vel, publishes /odom and the odom-to-trunk TF.</description>
+  <maintainer email="adharshvenkat@users.noreply.github.com">adharshvenkat</maintainer>
+  <license>MIT</license>
+
+  <depend>rclpy</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>tf2_ros</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>
