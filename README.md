@@ -6,8 +6,17 @@ manipulation policies trained with [mujoco_playground](https://github.com/google
 and a policy robustness evaluator.
 
 This is not a fork of mujoco_playground. It's a small set of original scripts
-that sit on top of it. mujoco_playground and mujoco_menagerie must be
-installed separately (see Setup).
+that sit on top of it.
+
+## Setup
+
+Requires a working mujoco_playground install (JAX/MJX, Brax, mujoco_menagerie
+assets) - see the [mujoco_playground README](https://github.com/google-deepmind/mujoco_playground)
+for install instructions, GPU requirements, and menagerie setup. `export_onnx.py`
+additionally needs `tensorflow`, `tf2onnx`, and `onnxruntime`.
+
+Run these scripts from the root of a mujoco_playground checkout, with this
+repo's `scripts/` copied in or on `PYTHONPATH`.
 
 ## Why the evaluator exists
 
@@ -88,16 +97,11 @@ looks like a normal robot driver to the rest of a Nav2 stack: subscribes
 publishes `/odom` plus the `odom -> trunk` TF from sim ground-truth sensors
 (`position`/`orientation`/`local_linvel`/`gyro` on the Go1 model's IMU site).
 
-The RL inference loop intentionally does not go through `ros2_control`. That
-abstraction is built around classical position/velocity/effort controllers
-with real-time and fixed-update-rate assumptions that don't map cleanly onto
-"run a neural net and push joint targets as fast as possible" - the pattern
-used across most learned-locomotion legged/humanoid platforms is a dedicated
-inference loop with ROS2 sitting above it as the task/navigation layer, which
-is what this node does. `ros2_control` is still the right tool for an
-arm/manipulation stack sitting on top of this (e.g. via MoveIt2) - matching
-the abstraction to the actual control pattern, not avoiding `ros2_control`
-categorically.
+The RL inference loop runs as a plain node, not through `ros2_control` -
+that abstraction targets classical position/velocity/effort control with
+fixed-rate assumptions that don't fit a neural-net inference loop.
+`ros2_control` is still the right choice for an arm/manipulation stack (e.g.
+via MoveIt2) layered on top.
 
 Build and run inside a colcon workspace:
 
@@ -110,13 +114,10 @@ colcon build --packages-select go1_policy_bridge
 source install/setup.bash
 ```
 
-The package imports `mujoco`/`onnxruntime`/`mujoco_playground` from the
-`mujoco_playground` `uv` venv, but `colcon`/`ros2 run` execute under system
-Python - these are two separate interpreters that don't share packages by
-default. Point system Python at the venv's packages (and, if
-`mujoco_playground` is an editable install, at its repo root, since editable
-installs use a `.pth` file that only gets processed by a venv's own site-init,
-not by a bare `PYTHONPATH` entry) before running:
+`colcon`/`ros2 run` use system Python, not the `mujoco_playground` `uv` venv
+where `mujoco`/`onnxruntime`/`mujoco_playground` are installed. Point system
+Python at the venv's packages and the `mujoco_playground` repo root (needed
+since it's an editable install) before running:
 
 ```
 export PYTHONPATH="<mujoco_playground_repo>:<mujoco_playground_repo>/.venv/lib/python3.12/site-packages:$PYTHONPATH"
@@ -153,14 +154,11 @@ navigation/control loop, not the localization stack:
   policy's command interface (`vx`/`vy`/`wz`) is independently controllable
   on all three axes, so `min_vel_y`/`max_vel_y` are nonzero rather than `0`.
 - **A static map with only a border wall, no interior obstacles yet.**
-  `config/maps/go1_rough_bounds.{pgm,yaml}` marks a ring of lethal cells
-  matching the actual MuJoCo heightfield extent (`hfield size="10 10 .05
-  1.0"` -> x,y in [-10, 10]). Costmap *size* bounds where the planner
-  operates; it does not by itself mark anything as an obstacle. Learned this
-  the hard way - the first version had no static layer, and a goal near the
-  boundary sent the robot walking straight off the edge of the sim terrain,
-  since nothing told the costmap that edge was lethal. Real obstacles inside
-  the world (not just the boundary) are a planned follow-up.
+  Costmap *size* bounds where the planner operates; it does not by itself
+  mark anything as an obstacle, so the boundary is added explicitly via
+  `config/maps/go1_rough_bounds.{pgm,yaml}`, a ring of lethal cells matching
+  the actual MuJoCo heightfield extent (`hfield size="10 10 .05 1.0"` ->
+  x,y in [-10, 10]). Real obstacles inside the world are a planned follow-up.
 
 Run it (driver already running per the section above):
 
@@ -177,30 +175,11 @@ followed accurately against real ground-truth odometry, boundary respected.
   <img src="assets/nav2_diagonal_demo.gif" alt="RViz2 recording of a full diagonal corner-to-corner Nav2 goal, tracked against real driver odometry" width="640">
 </p>
 
-**A note on visualizing this**, since it's a real trap: don't build a second,
-separate MuJoCo instance that mirrors `/cmd_vel` for a "visual" of the
-driver's behavior. It's tempting (and was tried here) - it avoids the
-GLFW/rclpy crash that comes from putting a viewer in the same process as the
-driver, since it's a fully separate process. But `/cmd_vel` is a body-frame
-command: correct for the real driver (whose heading DWB is actually
-computing against), meaningless applied to a second simulation with its own,
-different accumulated heading. The two will visibly diverge - watched this
-happen directly, where the real driver correctly tracked a diagonal path
-while the separate mirrored simulation went off at a wrong angle and fell off
-the map, despite both receiving identical commands. RViz2 (already part of
-this bringup, subscribing to the driver's actual `/odom`/TF) is the only
-visualization here that's guaranteed to represent what the driver is
-actually doing.
-
-## Setup
-
-Requires a working mujoco_playground install (JAX/MJX, Brax, mujoco_menagerie
-assets) - see the [mujoco_playground README](https://github.com/google-deepmind/mujoco_playground)
-for install instructions, GPU requirements, and menagerie setup. `export_onnx.py`
-additionally needs `tensorflow`, `tf2onnx`, and `onnxruntime`.
-
-Run these scripts from the root of a mujoco_playground checkout, with this
-repo's `scripts/` copied in or on `PYTHONPATH`.
+**Visualization:** use RViz2, not a second mirrored MuJoCo instance — `/cmd_vel`
+is a body-frame command, so a separate simulation's heading diverges from the
+driver's real one and produces visibly wrong motion despite receiving
+identical commands. RViz2 (subscribing to the driver's actual `/odom`/TF) is
+the only visualization here guaranteed to match the driver's real behavior.
 
 ## License
 
