@@ -133,6 +133,61 @@ ros2 topic pub /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.5}, angular: {z:
 ros2 topic echo /odom
 ```
 
+### Nav2 bringup
+
+`ros2/go1_policy_bridge/launch/nav2_bringup.launch.py` brings up a full Nav2
+stack against the driver above: `controller_server` (DWB), `planner_server`,
+`behavior_server` (recovery behaviors - Spin/BackUp/Wait, required by the
+default `NavigateToPose` behavior tree), `bt_navigator`, `map_server`, a
+lifecycle manager, and RViz2.
+
+A few deliberate simplifications, since the goal here is proving the
+navigation/control loop, not the localization stack:
+
+- **No AMCL, no separate `map` frame.** The driver already publishes
+  ground-truth `odom -> trunk` TF (see above), which is already "perfect
+  localization" - estimating it again via AMCL would be solving a problem
+  that doesn't exist yet. Every Nav2 component here uses `odom` directly as
+  `global_frame`.
+- **DWB configured as a holonomic base**, not differential-drive: the
+  policy's command interface (`vx`/`vy`/`wz`) is independently controllable
+  on all three axes, so `min_vel_y`/`max_vel_y` are nonzero rather than `0`.
+- **A static map with only a border wall, no interior obstacles yet.**
+  `config/maps/go1_rough_bounds.{pgm,yaml}` marks a ring of lethal cells
+  matching the actual MuJoCo heightfield extent (`hfield size="10 10 .05
+  1.0"` -> x,y in [-10, 10]). Costmap *size* bounds where the planner
+  operates; it does not by itself mark anything as an obstacle. Learned this
+  the hard way - the first version had no static layer, and a goal near the
+  boundary sent the robot walking straight off the edge of the sim terrain,
+  since nothing told the costmap that edge was lethal. Real obstacles inside
+  the world (not just the boundary) are a planned follow-up.
+
+Run it (driver already running per the section above):
+
+```
+ros2 launch go1_policy_bridge nav2_bringup.launch.py
+```
+
+In RViz2: set Fixed Frame to `odom`, add Map/TF/Path displays, and use "2D
+Goal Pose" to send a goal. Validated end-to-end on a full diagonal
+corner-to-corner goal: correct DWB holonomic tracking, path planned and
+followed accurately against real ground-truth odometry, boundary respected.
+
+**A note on visualizing this**, since it's a real trap: don't build a second,
+separate MuJoCo instance that mirrors `/cmd_vel` for a "visual" of the
+driver's behavior. It's tempting (and was tried here) - it avoids the
+GLFW/rclpy crash that comes from putting a viewer in the same process as the
+driver, since it's a fully separate process. But `/cmd_vel` is a body-frame
+command: correct for the real driver (whose heading DWB is actually
+computing against), meaningless applied to a second simulation with its own,
+different accumulated heading. The two will visibly diverge - watched this
+happen directly, where the real driver correctly tracked a diagonal path
+while the separate mirrored simulation went off at a wrong angle and fell off
+the map, despite both receiving identical commands. RViz2 (already part of
+this bringup, subscribing to the driver's actual `/odom`/TF) is the only
+visualization here that's guaranteed to represent what the driver is
+actually doing.
+
 ## Setup
 
 Requires a working mujoco_playground install (JAX/MJX, Brax, mujoco_menagerie
