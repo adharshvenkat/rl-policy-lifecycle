@@ -173,6 +173,10 @@ Goal Pose" to send a goal. Validated end-to-end on a full diagonal
 corner-to-corner goal: correct DWB holonomic tracking, path planned and
 followed accurately against real ground-truth odometry, boundary respected.
 
+<p align="center">
+  <img src="assets/nav2_diagonal_demo.gif" alt="RViz2 recording of a full diagonal corner-to-corner Nav2 goal, tracked against real driver odometry" width="640">
+</p>
+
 **A note on visualizing this**, since it's a real trap: don't build a second,
 separate MuJoCo instance that mirrors `/cmd_vel` for a "visual" of the
 driver's behavior. It's tempting (and was tried here) - it avoids the
